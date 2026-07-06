@@ -18,7 +18,7 @@ During rollout, IGRPO maintains an active set of intermediate search nodes. At e
 
 ## 🧩 Main Results
 <p align="center">
-  <img src="./figs/main_results.png" width="95%" alt="IGRPO Overview">
+  <img src="./figs/main_results.png" width="95%" alt="results">
 </p>
 
 ## 🚀 Installation
