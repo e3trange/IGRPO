@@ -76,7 +76,7 @@ IGRPO uses a local retrieval server during rollout generation. First activate th
 ```bash
 conda activate retriever
 
-bash examples/search/retriever/retrieval_launch.sh > retrieval_server.log 2>&1 &
+bash examples/search/retriever/retrieval_launch.sh > retrieval_server.log
 ```
 After the retriever server is ready, activate the IGRPO training environment and run the training script:
 ```bash
