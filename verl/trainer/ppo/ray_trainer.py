@@ -727,11 +727,14 @@ class RayPPOTrainer:
         self.validation_generations_logger.log(self.config.trainer.logger, samples, self.global_steps)
 
     def _validate(self):
+        from collections import Counter
+
         reward_tensor_lst = []
         data_source_lst = []
         tool_calling_list = []
         traj_uid_list = []
         success_rate_dict = {}
+        success_count_dict = {}
 
         # Lists to collect samples for the table
         sample_inputs = []
@@ -812,12 +815,28 @@ class RayPPOTrainer:
             data_source_lst.append(test_batch.non_tensor_batch.get('data_source', ['unknown'] * reward_tensor.shape[0]))
             tool_calling_list.append(test_output_gen_batch.non_tensor_batch['tool_callings'])
             traj_uid_list.append(test_output_gen_batch.non_tensor_batch['traj_uid'])
+
+            # Count each trajectory once, regardless of its number of rollout steps.
+            _, unique_indices = np.unique(test_batch.non_tensor_batch['traj_uid'], return_index=True)
+            source_counts = Counter(np.asarray(data_source_lst[-1])[unique_indices])
+            batch_success_counts = {
+                f'{source}_success_rate': count for source, count in source_counts.items()
+            }
+            batch_success_counts['success_rate'] = len(unique_indices)
+
             # success rate
             for k in test_batch.non_tensor_batch.keys():
                 if 'success_rate' in k:
+                    if k not in batch_success_counts:
+                        raise ValueError(
+                            f'Cannot determine the sample count for {k!r} from data_source. '
+                            'Metrics grouped by other fields require their own sample counts.'
+                        )
                     if k not in success_rate_dict:
                         success_rate_dict[k] = []
+                        success_count_dict[k] = []
                     success_rate_dict[k].append(test_batch.non_tensor_batch[k][0])
+                    success_count_dict[k].append(batch_success_counts[k])
                     # all success_rate should be the same
                     for i in range(1, len(test_batch.non_tensor_batch[k])):
                         assert test_batch.non_tensor_batch[k][0] == test_batch.non_tensor_batch[k][i], f'not all success_rate are the same, 0: {test_batch.non_tensor_batch[k][0]}, {i}: {test_batch.non_tensor_batch[k][i]}'
@@ -828,7 +847,7 @@ class RayPPOTrainer:
         data_sources = np.concatenate(data_source_lst, axis=0)
         tool_callings = np.concatenate(tool_calling_list, axis=0)
         traj_uids = np.concatenate(traj_uid_list, axis=0)
-        success_rate = {k: np.mean(v) for k, v in success_rate_dict.items()}
+        success_rate = {k: np.average(v, weights=success_count_dict[k]) for k, v in success_rate_dict.items()}
 
         # evaluate test_score based on data source
         data_source_reward = {}
